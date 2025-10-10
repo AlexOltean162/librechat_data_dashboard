@@ -28,10 +28,10 @@ This project exposes an Apache ECharts dashboard backed by the LibreChat MongoDB
 
      ```env
      MONGODB_HOST=hcux404.teagasc.net
-     MONGODB_PORT=27018
-     MONGODB_USERNAME=admin
-     MONGODB_PASSWORD=TeagascICT2025@!
-     MONGODB_AUTH_SOURCE=admin
+     MONGODB_PORT=
+     MONGODB_USERNAME=
+     MONGODB_PASSWORD=
+     MONGODB_AUTH_SOURCE=
      ```
 
    - If you're running LibreChat locally with the default `docker-compose` configuration (which starts MongoDB with `--noauth`), leave the username and password blank. The dashboard automatically retries without credentials when authentication is disabled.
