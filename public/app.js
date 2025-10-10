@@ -1,30 +1,18 @@
 const charts = {};
-const MESSAGE_PAGE_SIZE = 10;
 
 const elements = {
-  tableBody: document.getElementById('messages-table-body'),
-  tableMeta: document.getElementById('table-meta'),
   startDate: document.getElementById('start-date'),
   endDate: document.getElementById('end-date'),
   applyFilters: document.getElementById('apply-filters'),
   clearFilters: document.getElementById('clear-filters'),
   exportExcel: document.getElementById('export-excel'),
-  prevPage: document.getElementById('prev-page'),
-  nextPage: document.getElementById('next-page'),
-  pageIndicator: document.getElementById('page-indicator')
+  statusBanner: document.getElementById('status-banner')
 };
 
 const dashboardState = {
   filters: {
     startDate: '',
     endDate: ''
-  },
-  table: {
-    records: [],
-    totalMatching: 0,
-    limit: 50,
-    page: 1,
-    pageSize: MESSAGE_PAGE_SIZE
   },
   raw: null
 };
@@ -49,54 +37,22 @@ function formatNumber(value) {
   return value.toLocaleString();
 }
 
-function formatTimestamp(value) {
-  if (!value) {
-    return 'N/A';
+function setStatus(message, tone = 'info') {
+  if (!elements.statusBanner) {
+    return;
   }
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'N/A';
+  const banner = elements.statusBanner;
+  banner.classList.remove('info', 'error', 'success', 'hidden');
+
+  if (!message) {
+    banner.textContent = '';
+    banner.classList.add('hidden');
+    return;
   }
 
-  return date.toLocaleString();
-}
-
-function escapeHtml(value) {
-  return value.replace(/[&<>"']/g, (char) => {
-    switch (char) {
-      case '&':
-        return '&amp;';
-      case '<':
-        return '&lt;';
-      case '>':
-        return '&gt;';
-      case '"':
-        return '&quot;';
-      case "'":
-        return '&#39;';
-      default:
-        return char;
-    }
-  });
-}
-
-function normalizeMessageText(value) {
-  if (value == null) {
-    return 'No text';
-  }
-
-  if (typeof value === 'string') {
-    const trimmed = value.replace(/\s+/g, ' ').trim();
-    return trimmed ? escapeHtml(trimmed) : 'No text';
-  }
-
-  try {
-    const serialised = JSON.stringify(value);
-    return serialised ? escapeHtml(serialised) : 'No text';
-  } catch (error) {
-    return escapeHtml(String(value));
-  }
+  banner.textContent = message;
+  banner.classList.add(tone);
 }
 
 function renderTotals(totals = {}) {
@@ -110,7 +66,9 @@ function renderAgentsPerCategory(data = []) {
   const counts = data.map((item) => item.count ?? 0);
 
   initChart('agents-category-chart', {
-    tooltip: { trigger: 'axis' },
+    tooltip: {
+      trigger: 'axis'
+    },
     grid: { left: '6%', right: '4%', bottom: '8%', top: '6%', containLabel: true },
     xAxis: {
       type: 'value',
@@ -185,9 +143,87 @@ function renderMessagesPerUser(data = []) {
   });
 }
 
-function renderTimeSeriesChart(id, title, data = []) {
+function renderMessagesPerAgent(data = []) {
+  const labels = data.map((item) => item.agentLabel ?? 'Unassigned');
+  const counts = data.map((item) => item.messages ?? 0);
+  const averages = data.map((item) => item.averageMessagesPerConversation ?? 0);
+  const conversationCounts = data.map((item) => item.conversations ?? 0);
+
+  initChart('messages-agent-chart', {
+    tooltip: {
+      trigger: 'axis',
+      formatter(params) {
+        if (!Array.isArray(params) || !params.length) {
+          return '';
+        }
+        const index = params[0].dataIndex;
+        const agent = labels[index] || 'Unassigned';
+        const messageCount = counts[index] ?? 0;
+        const conversationCount = conversationCounts[index] ?? 0;
+        const avg = averages[index] ?? 0;
+        return `${agent}<br/>Messages: ${messageCount.toLocaleString()}<br/>Conversations: ${conversationCount.toLocaleString()}<br/>Avg per Conversation: ${avg}`;
+      }
+    },
+    grid: { left: '6%', right: '4%', bottom: '8%', top: '6%', containLabel: true },
+    xAxis: {
+      type: 'value'
+    },
+    yAxis: {
+      type: 'category',
+      data: labels,
+      axisLabel: { color: '#e2e8f0' }
+    },
+    series: [
+      {
+        name: 'Messages',
+        type: 'bar',
+        data: counts,
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(1, 0, 0, 0, [
+            { offset: 0, color: '#34d399' },
+            { offset: 1, color: '#059669' }
+          ])
+        }
+      }
+    ]
+  });
+}
+
+function renderConversationsPerAgent(data = []) {
+  const labels = data.map((item) => item.agentLabel ?? 'Unassigned');
+  const counts = data.map((item) => item.conversations ?? 0);
+
+  initChart('conversations-agent-chart', {
+    tooltip: { trigger: 'axis' },
+    grid: { left: '6%', right: '4%', bottom: '8%', top: '6%', containLabel: true },
+    xAxis: { type: 'value' },
+    yAxis: {
+      type: 'category',
+      data: labels,
+      axisLabel: { color: '#e2e8f0' }
+    },
+    series: [
+      {
+        name: 'Conversations',
+        type: 'bar',
+        data: counts,
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(1, 0, 0, 0, [
+            { offset: 0, color: '#c084fc' },
+            { offset: 1, color: '#7c3aed' }
+          ])
+        }
+      }
+    ]
+  });
+}
+
+function renderTimeSeriesChart(id, title, data = [], colors = {}) {
   const dates = data.map((item) => item.date);
   const counts = data.map((item) => item.count ?? 0);
+  const lineColor = colors.line || '#6366f1';
+  const areaStart = colors.areaStart || 'rgba(99, 102, 241, 0.45)';
+  const areaEnd = colors.areaEnd || 'rgba(59, 130, 246, 0.1)';
 
   initChart(id, {
     tooltip: { trigger: 'axis' },
@@ -209,113 +245,56 @@ function renderTimeSeriesChart(id, title, data = []) {
         symbolSize: 8,
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(99, 102, 241, 0.45)' },
-            { offset: 1, color: 'rgba(59, 130, 246, 0.1)' }
+            { offset: 0, color: areaStart },
+            { offset: 1, color: areaEnd }
           ])
         },
         lineStyle: {
-          width: 3
+          width: 3,
+          color: lineColor
         },
+        itemStyle: { color: lineColor },
         data: counts
       }
     ]
   });
 }
 
-function updatePaginationControls(totalPages) {
-  if (!elements.prevPage || !elements.nextPage || !elements.pageIndicator) {
-    return;
-  }
+function renderMessagesByEndpoint(data = []) {
+  const seriesData = data.map((item) => ({
+    name: item.endpoint ?? 'Unknown',
+    value: item.count ?? 0
+  }));
 
-  if (!dashboardState.table.records.length) {
-    elements.prevPage.disabled = true;
-    elements.nextPage.disabled = true;
-    elements.pageIndicator.textContent = 'Page 0 of 0';
-    return;
-  }
-
-  elements.prevPage.disabled = dashboardState.table.page <= 1;
-  elements.nextPage.disabled = dashboardState.table.page >= totalPages;
-  elements.pageIndicator.textContent = `Page ${dashboardState.table.page} of ${totalPages}`;
-}
-
-function renderMessagesTable() {
-  if (!elements.tableBody || !elements.tableMeta) {
-    return;
-  }
-
-  const { records, page, pageSize, totalMatching } = dashboardState.table;
-
-  if (!records.length) {
-    elements.tableBody.innerHTML = `
-      <tr>
-        <td colspan="5" class="empty">No messages found.</td>
-      </tr>
-    `;
-    elements.tableMeta.textContent = '0 messages';
-    updatePaginationControls(0);
-    return;
-  }
-
-  const totalPages = Math.max(1, Math.ceil(records.length / pageSize));
-  if (page > totalPages) {
-    dashboardState.table.page = totalPages;
-  }
-
-  const startIndex = (dashboardState.table.page - 1) * pageSize;
-  const pageRecords = records.slice(startIndex, startIndex + pageSize);
-
-  elements.tableBody.innerHTML = pageRecords
-    .map((message) => {
-      const timestamp = escapeHtml(formatTimestamp(message.createdAt));
-      const userDisplay = escapeHtml((message.userName || message.userId || 'Unknown').toString());
-      const conversation = message.conversationId ? escapeHtml(message.conversationId.toString()) : '—';
-      const sender = escapeHtml((message.sender ?? 'Unknown').toString());
-      const textContent = normalizeMessageText(message.text);
-
-      return `
-        <tr>
-          <td>${timestamp}</td>
-          <td>${userDisplay}</td>
-          <td>${sender}</td>
-          <td>${conversation}</td>
-          <td>${textContent}</td>
-        </tr>
-      `;
-    })
-    .join('');
-
-  const startDisplay = startIndex + 1;
-  const endDisplay = startIndex + pageRecords.length;
-  const limitedTotal = records.length;
-  const parts = [`Showing ${startDisplay}-${endDisplay} of ${limitedTotal} messages`];
-  if (totalMatching > limitedTotal) {
-    parts.push(`(displaying first ${limitedTotal} of ${totalMatching} messages)`);
-  } else if (dashboardState.table.limit && limitedTotal === dashboardState.table.limit) {
-    parts.push(`(displaying first ${limitedTotal} messages)`);
-  }
-  elements.tableMeta.textContent = parts.join(' ');
-
-  updatePaginationControls(totalPages);
-}
-
-function displayTableMessage(message) {
-  if (!elements.tableBody || !elements.tableMeta) {
-    return;
-  }
-
-  dashboardState.table.records = [];
-  dashboardState.table.totalMatching = 0;
-  dashboardState.table.page = 1;
-
-  const safeMessage = escapeHtml(message);
-  elements.tableBody.innerHTML = `
-    <tr>
-      <td colspan="5" class="empty">${safeMessage}</td>
-    </tr>
-  `;
-  elements.tableMeta.textContent = message;
-  updatePaginationControls(0);
+  initChart('messages-endpoint-chart', {
+    tooltip: {
+      trigger: 'item',
+      formatter: (params) => `${params.name}: ${params.value.toLocaleString()} (${params.percent}%)`
+    },
+    legend: {
+      orient: 'horizontal',
+      bottom: 0,
+      textStyle: { color: '#cbd5f5' }
+    },
+    series: [
+      {
+        name: 'Messages',
+        type: 'pie',
+        radius: ['35%', '70%'],
+        avoidLabelOverlap: true,
+        padAngle: 2,
+        itemStyle: {
+          borderRadius: 12,
+          borderColor: '#0f172a',
+          borderWidth: 2
+        },
+        label: {
+          formatter: '{b}: {d}%'
+        },
+        data: seriesData
+      }
+    ]
+  });
 }
 
 function syncFilterInputs() {
@@ -336,6 +315,7 @@ function validateDateRange(start, end) {
 
 async function loadDashboard() {
   try {
+    setStatus('Loading data…', 'info');
     const params = new URLSearchParams();
     if (dashboardState.filters.startDate) {
       params.append('startDate', dashboardState.filters.startDate);
@@ -353,7 +333,7 @@ async function loadDashboard() {
         const payload = await response.json();
         errorMessage = payload?.message || payload?.error || errorMessage;
       } catch (parseError) {
-        // ignore JSON parse errors and use default message
+        // Ignore JSON parse errors and use default message
       }
       throw new Error(errorMessage);
     }
@@ -367,20 +347,33 @@ async function loadDashboard() {
       syncFilterInputs();
     }
 
-    dashboardState.table.records = Array.isArray(data.messagesTable?.records) ? data.messagesTable.records : [];
-    dashboardState.table.totalMatching = Number(data.messagesTable?.totalMatching) || dashboardState.table.records.length;
-    dashboardState.table.limit = Number(data.messagesTable?.limit) || dashboardState.table.records.length;
-    dashboardState.table.page = 1;
-
     renderTotals(data.totals);
     renderAgentsPerCategory(data.agentsPerCategory);
     renderMessagesPerUser(data.messagesPerUser);
     renderTimeSeriesChart('messages-day-chart', 'Messages', data.messagesPerDay);
-    renderTimeSeriesChart('users-day-chart', 'Users Logged', data.usersLoggedPerDay);
-    renderMessagesTable();
+    renderTimeSeriesChart('users-day-chart', 'Users Logged', data.usersLoggedPerDay, {
+      line: '#22c55e',
+      areaStart: 'rgba(34, 197, 94, 0.45)',
+      areaEnd: 'rgba(34, 197, 94, 0.08)'
+    });
+    renderMessagesPerAgent(data.messagesPerAgent);
+    renderConversationsPerAgent(data.conversationsPerAgent);
+    renderTimeSeriesChart('active-users-day-chart', 'Active Users', data.activeUsersPerDay, {
+      line: '#fb923c',
+      areaStart: 'rgba(251, 146, 60, 0.45)',
+      areaEnd: 'rgba(251, 146, 60, 0.08)'
+    });
+    renderTimeSeriesChart('new-users-day-chart', 'New Users', data.newUsersPerDay, {
+      line: '#a855f7',
+      areaStart: 'rgba(168, 85, 247, 0.45)',
+      areaEnd: 'rgba(168, 85, 247, 0.08)'
+    });
+    renderMessagesByEndpoint(data.messagesByEndpoint);
+
+    setStatus('Dashboard refreshed successfully.', 'success');
   } catch (error) {
     console.error('Failed to load dashboard', error);
-    displayTableMessage(`Failed to load data. ${error.message}`);
+    setStatus(`Failed to load data. ${error.message}`, 'error');
   }
 }
 
@@ -389,35 +382,20 @@ function handleApplyFilters() {
   const end = elements.endDate?.value || '';
 
   if (!validateDateRange(start, end)) {
-    displayTableMessage('Invalid date range. Start date must be before end date.');
+    setStatus('Invalid date range. Start date must be before end date.', 'error');
     return;
   }
 
   dashboardState.filters.startDate = start;
   dashboardState.filters.endDate = end;
-  dashboardState.table.page = 1;
-  displayTableMessage('Loading data…');
   loadDashboard();
 }
 
 function handleClearFilters() {
   dashboardState.filters.startDate = '';
   dashboardState.filters.endDate = '';
-  dashboardState.table.page = 1;
   syncFilterInputs();
-  displayTableMessage('Loading data…');
   loadDashboard();
-}
-
-function handlePagination(delta) {
-  const { records, pageSize } = dashboardState.table;
-  const totalPages = Math.max(1, Math.ceil(records.length / pageSize));
-  const nextPage = dashboardState.table.page + delta;
-  if (nextPage < 1 || nextPage > totalPages) {
-    return;
-  }
-  dashboardState.table.page = nextPage;
-  renderMessagesTable();
 }
 
 function exportDashboardToExcel() {
@@ -451,19 +429,36 @@ function exportDashboardToExcel() {
   XLSX.utils.book_append_sheet(workbook, messagesPerDaySheet, 'Messages per Day');
 
   const usersPerDaySheet = XLSX.utils.json_to_sheet(dashboardState.raw.usersLoggedPerDay ?? []);
-  XLSX.utils.book_append_sheet(workbook, usersPerDaySheet, 'Users per Day');
+  XLSX.utils.book_append_sheet(workbook, usersPerDaySheet, 'Users Logged per Day');
 
-  const messageRecords = (dashboardState.raw.messagesTable?.records ?? []).map((record) => ({
-    Timestamp: formatTimestamp(record.createdAt),
-    User: record.userName || record.userId || 'Unknown',
-    UserId: record.userId || '',
-    Sender: record.sender || '',
-    ConversationId: record.conversationId || '',
-    MessageId: record.messageId || '',
-    Text: typeof record.text === 'string' ? record.text : JSON.stringify(record.text ?? '')
-  }));
-  const messagesSheet = XLSX.utils.json_to_sheet(messageRecords);
-  XLSX.utils.book_append_sheet(workbook, messagesSheet, 'Recent Messages');
+  const conversationsPerAgentSheet = XLSX.utils.json_to_sheet(
+    (dashboardState.raw.conversationsPerAgent ?? []).map((item) => ({
+      agentId: item.agentId || '',
+      agentLabel: item.agentLabel || 'Unassigned',
+      conversations: item.conversations ?? 0
+    }))
+  );
+  XLSX.utils.book_append_sheet(workbook, conversationsPerAgentSheet, 'Conversations per Agent');
+
+  const messagesPerAgentSheet = XLSX.utils.json_to_sheet(
+    (dashboardState.raw.messagesPerAgent ?? []).map((item) => ({
+      agentId: item.agentId || '',
+      agentLabel: item.agentLabel || 'Unassigned',
+      messages: item.messages ?? 0,
+      conversations: item.conversations ?? 0,
+      averageMessagesPerConversation: item.averageMessagesPerConversation ?? 0
+    }))
+  );
+  XLSX.utils.book_append_sheet(workbook, messagesPerAgentSheet, 'Messages per Agent');
+
+  const endpointSheet = XLSX.utils.json_to_sheet(dashboardState.raw.messagesByEndpoint ?? []);
+  XLSX.utils.book_append_sheet(workbook, endpointSheet, 'Messages by Endpoint');
+
+  const activeUsersSheet = XLSX.utils.json_to_sheet(dashboardState.raw.activeUsersPerDay ?? []);
+  XLSX.utils.book_append_sheet(workbook, activeUsersSheet, 'Active Users per Day');
+
+  const newUsersSheet = XLSX.utils.json_to_sheet(dashboardState.raw.newUsersPerDay ?? []);
+  XLSX.utils.book_append_sheet(workbook, newUsersSheet, 'New Users per Day');
 
   const dateSuffix = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(workbook, `librechat-dashboard-${dateSuffix}.xlsx`);
@@ -471,7 +466,6 @@ function exportDashboardToExcel() {
 
 window.addEventListener('load', () => {
   syncFilterInputs();
-  displayTableMessage('Loading data…');
   loadDashboard();
 
   if (elements.applyFilters) {
@@ -484,14 +478,6 @@ window.addEventListener('load', () => {
 
   if (elements.exportExcel) {
     elements.exportExcel.addEventListener('click', exportDashboardToExcel);
-  }
-
-  if (elements.prevPage) {
-    elements.prevPage.addEventListener('click', () => handlePagination(-1));
-  }
-
-  if (elements.nextPage) {
-    elements.nextPage.addEventListener('click', () => handlePagination(1));
   }
 
   window.addEventListener('resize', () => {

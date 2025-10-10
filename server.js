@@ -16,7 +16,6 @@ const __dirname = path.dirname(__filename);
 
 const { uri: mongoUri, fallbackUri } = buildMongoConfig();
 const mongoDbName = process.env.MONGODB_DB || 'LibreChat';
-const MESSAGE_TABLE_LIMIT = 50;
 
 if (!mongoUri) {
   console.warn('Warning: MongoDB connection details are missing. Configure environment variables before starting the server.');
@@ -78,22 +77,6 @@ function parseDateInput(value, boundary = 'start') {
   }
 
   return date;
-}
-
-function buildDateRangeQuery(field, startDate, endDate) {
-  if (!startDate && !endDate) {
-    return null;
-  }
-
-  const range = {};
-  if (startDate) {
-    range.$gte = startDate;
-  }
-  if (endDate) {
-    range.$lte = endDate;
-  }
-
-  return { [field]: range };
 }
 
 function createDateMatchStage(field, startDate, endDate) {
@@ -209,6 +192,115 @@ function getUserDisplayName(userDoc) {
   return 'Unknown';
 }
 
+function getAgentDisplayName(agentDoc) {
+  if (!agentDoc) {
+    return 'Unknown';
+  }
+
+  if (typeof agentDoc.name === 'string' && agentDoc.name.trim()) {
+    return agentDoc.name.trim();
+  }
+
+  if (typeof agentDoc.label === 'string' && agentDoc.label.trim()) {
+    return agentDoc.label.trim();
+  }
+
+  if (Array.isArray(agentDoc.conversation_starters) && agentDoc.conversation_starters.length) {
+    const starter = agentDoc.conversation_starters.find((item) => typeof item === 'string' && item.trim());
+    if (starter) {
+      return starter.trim();
+    }
+  }
+
+  if (typeof agentDoc.id === 'string' && agentDoc.id.trim()) {
+    return agentDoc.id.trim();
+  }
+
+  if (agentDoc._id instanceof ObjectId) {
+    return agentDoc._id.toString();
+  }
+
+  return 'Unknown';
+}
+
+function normalizeIdentifier(value) {
+  if (value == null) {
+    return null;
+  }
+
+  if (value instanceof ObjectId) {
+    return value.toString();
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+
+  return String(value);
+}
+
+async function buildAgentLookup(collection, identifiers = []) {
+  if (!collection || !Array.isArray(identifiers) || !identifiers.length) {
+    return new Map();
+  }
+
+  const uniqueIds = new Set();
+  const objectIds = [];
+  const stringIds = [];
+
+  identifiers.forEach((identifier) => {
+    const key = normalizeIdentifier(identifier);
+    if (!key || uniqueIds.has(key)) {
+      return;
+    }
+    uniqueIds.add(key);
+
+    stringIds.push(key);
+    if (ObjectId.isValid(key)) {
+      try {
+        objectIds.push(new ObjectId(key));
+      } catch (error) {
+        // Ignore invalid ObjectId construction
+      }
+    }
+  });
+
+  const projections = { name: 1, label: 1, conversation_starters: 1, id: 1 };
+  const queries = [];
+
+  if (objectIds.length) {
+    queries.push(collection.find({ _id: { $in: objectIds } }).project(projections).toArray());
+  }
+
+  if (stringIds.length) {
+    queries.push(collection.find({ id: { $in: stringIds } }).project(projections).toArray());
+  }
+
+  if (!queries.length) {
+    return new Map();
+  }
+
+  const results = (await Promise.all(queries)).flat();
+  const map = new Map();
+
+  results.forEach((doc) => {
+    if (!doc) {
+      return;
+    }
+
+    if (doc._id instanceof ObjectId) {
+      map.set(doc._id.toString(), doc);
+    }
+
+    if (typeof doc.id === 'string' && doc.id.trim()) {
+      map.set(doc.id.trim(), doc);
+    }
+  });
+
+  return map;
+}
+
 async function getDb() {
   if (!client) {
     throw new Error('MongoDB client is not configured. Set MONGODB_URI or individual connection variables.');
@@ -261,6 +353,7 @@ app.get('/api/dashboard', async (req, res) => {
     const usersCollection = db.collection('users');
     const agentsCollection = db.collection('agents');
     const messagesCollection = db.collection('messages');
+    const conversationsCollection = db.collection('conversations');
     const startDate = parseDateInput(req.query.startDate, 'start');
     const endDate = parseDateInput(req.query.endDate, 'end');
 
@@ -268,12 +361,19 @@ app.get('/api/dashboard', async (req, res) => {
       return res.status(400).json({ error: 'Invalid date range: startDate must be before endDate.' });
     }
 
-    const messageCountQuery = buildDateRangeQuery('createdAt', startDate, endDate) ?? {};
-
     const [totalUsers, totalAgents, totalMessages] = await Promise.all([
       usersCollection.countDocuments(),
       agentsCollection.countDocuments(),
-      messagesCollection.countDocuments(messageCountQuery)
+      messagesCollection.countDocuments(
+        startDate || endDate
+          ? {
+              createdAt: {
+                ...(startDate ? { $gte: startDate } : {}),
+                ...(endDate ? { $lte: endDate } : {})
+              }
+            }
+          : {}
+      )
     ]);
 
     const agentsPerCategoryPromise = agentsCollection
@@ -383,74 +483,179 @@ app.get('/api/dashboard', async (req, res) => {
       ])
       .toArray();
 
-    const messagesTablePromise = (async () => {
-      const tableConditions = [{ sender: 'User' }, { createdAt: { $type: 'date' } }];
-      const dateQuery = buildDateRangeQuery('createdAt', startDate, endDate);
-      if (dateQuery) {
-        tableConditions.push(dateQuery);
-      }
-
-      const matchStage = tableConditions.length > 1 ? { $and: tableConditions } : tableConditions[0];
-      const totalMatching = await messagesCollection.countDocuments(matchStage);
-
-      const records = await messagesCollection
+    const conversationsPerAgentPromise = (async () => {
+      const grouped = await conversationsCollection
         .aggregate([
-          { $match: matchStage },
+          createDateMatchStage('createdAt', startDate, endDate),
           {
-            $project: {
-              _id: 0,
-              messageId: '$messageId',
-              conversationId: '$conversationId',
-              user: '$user',
-              sender: '$sender',
-              text: {
-                $ifNull: ['$text', '$content']
-              },
-              createdAt: 1
+            $group: {
+              _id: '$agent_id',
+              conversations: { $sum: 1 }
             }
           },
-          { $sort: { createdAt: -1 } },
-          { $limit: MESSAGE_TABLE_LIMIT }
+          { $sort: { conversations: -1 } }
         ])
         .toArray();
 
-      const userIdsForTable = collectObjectIds(records.map((record) => record.user));
-      const tableUsers = userIdsForTable.length
-        ? await usersCollection
-            .find({ _id: { $in: userIdsForTable } })
-            .project({ name: 1, username: 1, email: 1, personalization: 1 })
-            .toArray()
-        : [];
-      const tableUserMap = new Map(tableUsers.map((doc) => [doc._id.toString(), doc]));
+      const agentLookup = await buildAgentLookup(agentsCollection, grouped.map((item) => item._id));
 
-      const normalizedRecords = records.map((record) => {
-        const userId = record.user ? record.user.toString() : null;
-        const userName = userId ? getUserDisplayName(tableUserMap.get(userId)) : 'Unknown';
-
+      return grouped.map((item) => {
+        const key = normalizeIdentifier(item._id);
+        const agentDoc = key ? agentLookup.get(key) : null;
         return {
-          messageId: record.messageId ?? null,
-          conversationId: record.conversationId ?? null,
-          userId,
-          userName,
-          sender: record.sender ?? null,
-          text: record.text ?? null,
-          createdAt: record.createdAt instanceof Date ? record.createdAt.toISOString() : null
+          agentId: key,
+          agentLabel: agentDoc ? getAgentDisplayName(agentDoc) : key || 'Unassigned',
+          conversations: item.conversations
         };
       });
-
-      return {
-        totalMatching,
-        limit: MESSAGE_TABLE_LIMIT,
-        records: normalizedRecords
-      };
     })();
 
-    const [agentsPerCategory, messagesPerUser, messagesPerDay, usersLoggedPerDay, messagesTable] = await Promise.all([
+    const messagesPerAgentPromise = (async () => {
+      const pipeline = [
+        createDateMatchStage('createdAt', startDate, endDate),
+        { $match: { conversationId: { $exists: true, $ne: null } } },
+        {
+          $group: {
+            _id: '$conversationId',
+            messageCount: { $sum: 1 }
+          }
+        },
+        {
+          $lookup: {
+            from: 'conversations',
+            localField: '_id',
+            foreignField: 'conversationId',
+            as: 'conversationDoc'
+          }
+        },
+        { $unwind: { path: '$conversationDoc', preserveNullAndEmptyArrays: true } },
+        {
+          $group: {
+            _id: '$conversationDoc.agent_id',
+            messages: { $sum: '$messageCount' },
+            conversations: {
+              $sum: {
+                $cond: [{ $ifNull: ['$conversationDoc', false] }, 1, 0]
+              }
+            }
+          }
+        },
+        {
+          $project: {
+            messages: 1,
+            conversations: 1
+          }
+        },
+        { $sort: { messages: -1 } }
+      ];
+
+      const grouped = await messagesCollection.aggregate(pipeline).toArray();
+      const agentLookup = await buildAgentLookup(agentsCollection, grouped.map((item) => item._id));
+
+      return grouped.map((item) => {
+        const key = normalizeIdentifier(item._id);
+        const agentDoc = key ? agentLookup.get(key) : null;
+        const conversations = item.conversations || 0;
+        const average = conversations > 0 ? item.messages / conversations : item.messages;
+        return {
+          agentId: key,
+          agentLabel: agentDoc ? getAgentDisplayName(agentDoc) : key || 'Unassigned',
+          messages: item.messages,
+          conversations,
+          averageMessagesPerConversation: Number(average.toFixed(2))
+        };
+      });
+    })();
+
+    const messagesByEndpointPromise = messagesCollection
+      .aggregate([
+        createDateMatchStage('createdAt', startDate, endDate),
+        {
+          $group: {
+            _id: {
+              $cond: [{ $ifNull: ['$endpoint', false] }, '$endpoint', 'Unknown']
+            },
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            endpoint: '$_id',
+            count: 1
+          }
+        },
+        { $sort: { count: -1 } }
+      ])
+      .toArray();
+
+    const activeUsersPerDayPromise = messagesCollection
+      .aggregate([
+        createDateMatchStage('createdAt', startDate, endDate),
+        { $match: { user: { $exists: true, $ne: null } } },
+        {
+          $group: {
+            _id: {
+              date: {
+                $dateToString: {
+                  format: '%Y-%m-%d',
+                  date: '$createdAt'
+                }
+              },
+              user: '$user'
+            }
+          }
+        },
+        {
+          $group: {
+            _id: '$_id.date',
+            count: { $sum: 1 }
+          }
+        },
+        { $project: { _id: 0, date: '$_id', count: 1 } },
+        { $sort: { date: 1 } }
+      ])
+      .toArray();
+
+    const newUsersPerDayPromise = usersCollection
+      .aggregate([
+        createDateMatchStage('createdAt', startDate, endDate),
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: '$createdAt'
+              }
+            },
+            count: { $sum: 1 }
+          }
+        },
+        { $project: { _id: 0, date: '$_id', count: 1 } },
+        { $sort: { date: 1 } }
+      ])
+      .toArray();
+
+    const [
+      agentsPerCategory,
+      messagesPerUser,
+      messagesPerDay,
+      usersLoggedPerDay,
+      conversationsPerAgent,
+      messagesPerAgent,
+      messagesByEndpoint,
+      activeUsersPerDay,
+      newUsersPerDay
+    ] = await Promise.all([
       agentsPerCategoryPromise,
       messagesPerUserPromise,
       messagesPerDayPromise,
       usersLoggedPerDayPromise,
-      messagesTablePromise
+      conversationsPerAgentPromise,
+      messagesPerAgentPromise,
+      messagesByEndpointPromise,
+      activeUsersPerDayPromise,
+      newUsersPerDayPromise
     ]);
 
     res.json({
@@ -467,7 +672,11 @@ app.get('/api/dashboard', async (req, res) => {
       messagesPerUser,
       messagesPerDay,
       usersLoggedPerDay,
-      messagesTable
+      conversationsPerAgent,
+      messagesPerAgent,
+      messagesByEndpoint,
+      activeUsersPerDay,
+      newUsersPerDay
     });
   } catch (error) {
     console.error('Error loading dashboard data:', error);

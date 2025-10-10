@@ -1,16 +1,16 @@
 # LibreChat Data Dashboard
 
-This project exposes an Apache ECharts dashboard backed by the LibreChat MongoDB database. The dashboard surfaces headline metrics, activity breakdowns, and a live feed of recent messages by querying the database through an Express API.
+This project exposes an Apache ECharts dashboard backed by the LibreChat MongoDB database. The dashboard surfaces headline metrics and operational activity breakdowns by querying the database through an Express API.
 
 ## Features
 
 - Total counts for agents, users, and messages.
 - Agent distribution by category with automatic label resolution.
 - Top message authors rendered with the users' first and last names instead of raw identifiers.
-- Daily time series for message traffic and user logins (based on `updatedAt`).
-- Interactive date slicer (single day or range) that refines the charts and recent message feed on demand.
-- Recent user-authored messages (first 50 records) with 10-per-page pagination and sender filtering.
-- One-click Excel export covering the headline metrics, chart datasets, and the filtered messages sample.
+- Daily time series for message traffic, active users, new users, and login activity (based on `updatedAt`).
+- Operational views for messages per agent, conversations per agent, and message distribution by endpoint to highlight adoption patterns.
+- Interactive date slicer (single day or range) that refines every chart on demand and reports filter status inline.
+- One-click Excel export covering the headline metrics and all chart datasets for offline analysis.
 - Responsive layout with animated cards and enlarged chart canvases powered by Apache ECharts.
 
 ## Getting started
