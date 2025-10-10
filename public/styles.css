@@ -176,9 +176,21 @@ main {
 }
 
 .chart-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 1.75rem;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.75rem;
+}
+
+@media (min-width: 1024px) {
+  .chart-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .chart-card {

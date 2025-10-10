@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -110,20 +110,47 @@ function createDateMatchStage(field, startDate, endDate) {
   };
 }
 
-function uniqueObjectIds(values = []) {
-  const map = new Map();
+function coerceToObjectId(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof ObjectId) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed && ObjectId.isValid(trimmed)) {
+      try {
+        return new ObjectId(trimmed);
+      } catch (error) {
+        return null;
+      }
+    }
+  }
+
+  return null;
+}
+
+function collectObjectIds(values = []) {
+  const seen = new Set();
+  const results = [];
+
   values.forEach((value) => {
-    if (!value) {
+    const objectId = coerceToObjectId(value);
+    if (!objectId) {
       return;
     }
 
-    const key = value.toString();
-    if (!map.has(key)) {
-      map.set(key, value);
+    const key = objectId.toString();
+    if (!seen.has(key)) {
+      seen.add(key);
+      results.push(objectId);
     }
   });
 
-  return Array.from(map.values());
+  return results;
 }
 
 function getUserDisplayName(userDoc) {
@@ -131,54 +158,52 @@ function getUserDisplayName(userDoc) {
     return 'Unknown';
   }
 
-  const nameField = userDoc.name;
-  const personalization = userDoc.personalization?.profile || {};
+  const { name, personalization, username, email } = userDoc;
 
-  let firstName = typeof personalization.firstName === 'string' ? personalization.firstName.trim() : '';
-  let lastName = typeof personalization.lastName === 'string' ? personalization.lastName.trim() : '';
-
-  if (typeof nameField === 'object' && nameField !== null) {
-    if (!firstName && typeof nameField.first === 'string') {
-      firstName = nameField.first.trim();
-    }
-    if (!lastName && typeof nameField.last === 'string') {
-      lastName = nameField.last.trim();
-    }
+  if (typeof name === 'string' && name.trim()) {
+    return name.trim();
   }
 
-  if ((!firstName || !lastName) && typeof nameField === 'string' && nameField.trim()) {
-    const parts = nameField.trim().split(/\s+/).filter(Boolean);
-    if (!firstName && parts.length) {
-      firstName = parts[0];
+  const profile = personalization?.profile || {};
+  const candidates = [];
+
+  if (name && typeof name === 'object') {
+    if (typeof name.first === 'string' && name.first.trim()) {
+      candidates.push(name.first.trim());
     }
-    if (!lastName && parts.length > 1) {
-      lastName = parts[parts.length - 1];
+    if (typeof name.last === 'string' && name.last.trim()) {
+      candidates.push(name.last.trim());
     }
   }
 
-  const combined = `${firstName ?? ''} ${lastName ?? ''}`.trim();
-  if (combined) {
-    return combined;
+  if (typeof profile.firstName === 'string' && profile.firstName.trim()) {
+    candidates.push(profile.firstName.trim());
+  }
+  if (typeof profile.lastName === 'string' && profile.lastName.trim()) {
+    candidates.push(profile.lastName.trim());
   }
 
-  if (firstName) {
-    return firstName;
+  const uniqueParts = [...new Set(candidates.filter(Boolean))];
+  if (uniqueParts.length) {
+    return uniqueParts.join(' ');
   }
 
-  if (lastName) {
-    return lastName;
+  if (name && typeof name === 'object') {
+    const fallback = [name.first, name.last]
+      .map((part) => (typeof part === 'string' ? part.trim() : ''))
+      .filter(Boolean)
+      .join(' ');
+    if (fallback) {
+      return fallback;
+    }
   }
 
-  if (typeof nameField === 'string' && nameField.trim()) {
-    return nameField.trim();
+  if (typeof username === 'string' && username.trim()) {
+    return username.trim();
   }
 
-  if (typeof userDoc.username === 'string' && userDoc.username.trim()) {
-    return userDoc.username.trim();
-  }
-
-  if (typeof userDoc.email === 'string' && userDoc.email.trim()) {
-    return userDoc.email.trim();
+  if (typeof email === 'string' && email.trim()) {
+    return email.trim();
   }
 
   return 'Unknown';
@@ -300,7 +325,7 @@ app.get('/api/dashboard', async (req, res) => {
       ];
       const grouped = await messagesCollection.aggregate(pipeline).toArray();
 
-      const userIds = uniqueObjectIds(grouped.map((item) => item._id).filter(Boolean));
+      const userIds = collectObjectIds(grouped.map((item) => item._id));
       const userDocs = userIds.length
         ? await usersCollection
             .find({ _id: { $in: userIds } })
@@ -389,7 +414,7 @@ app.get('/api/dashboard', async (req, res) => {
         ])
         .toArray();
 
-      const userIdsForTable = uniqueObjectIds(records.map((record) => record.user).filter(Boolean));
+      const userIdsForTable = collectObjectIds(records.map((record) => record.user));
       const tableUsers = userIdsForTable.length
         ? await usersCollection
             .find({ _id: { $in: userIdsForTable } })
