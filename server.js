@@ -14,22 +14,23 @@ app.use(express.json());
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const mongoUri = buildMongoUri();
+const { uri: mongoUri, fallbackUri } = buildMongoConfig();
 const mongoDbName = process.env.MONGODB_DB || 'LibreChat';
 
 if (!mongoUri) {
   console.warn('Warning: MongoDB connection details are missing. Configure environment variables before starting the server.');
 }
 
-const client = mongoUri
+let client = mongoUri
   ? new MongoClient(mongoUri, {
       maxPoolSize: 10
     })
   : null;
 
-function buildMongoUri() {
-  if (process.env.MONGODB_URI) {
-    return process.env.MONGODB_URI;
+function buildMongoConfig() {
+  const directUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+  if (directUri) {
+    return { uri: directUri, fallbackUri: null };
   }
 
   const host = process.env.MONGODB_HOST;
@@ -40,16 +41,23 @@ function buildMongoUri() {
   const authSource = process.env.MONGODB_AUTH_SOURCE;
 
   if (!host) {
-    return null;
+    return { uri: null, fallbackUri: null };
   }
 
-  const credentials = username && password
+  const credentialsPresent = Boolean(username && password);
+
+  const credentials = credentialsPresent
     ? `${encodeURIComponent(username)}:${encodeURIComponent(password)}@`
     : '';
 
   const query = authSource ? `?authSource=${encodeURIComponent(authSource)}` : '';
 
-  return `mongodb://${credentials}${host}:${port}/${dbName}${query}`;
+  const uri = `mongodb://${credentials}${host}:${port}/${dbName}${query}`;
+
+  return {
+    uri,
+    fallbackUri: credentialsPresent ? `mongodb://${host}:${port}/${dbName}` : null
+  };
 }
 
 async function getDb() {
@@ -61,13 +69,31 @@ async function getDb() {
     try {
       await client.connect();
     } catch (error) {
-      if (error?.code === 18 || error?.codeName === 'AuthenticationFailed') {
+      if (isAuthenticationError(error)) {
         console.error('MongoDB authentication failed. Verify your username/password and ensure special characters are percent-encoded.');
+        if (fallbackUri) {
+          console.warn('Retrying MongoDB connection without credentials because the target deployment may not require authentication.');
+          try {
+            await client.close().catch(() => {});
+            client = new MongoClient(fallbackUri, { maxPoolSize: 10 });
+            await client.connect();
+          } catch (fallbackError) {
+            if (isAuthenticationError(fallbackError)) {
+              console.error('Fallback unauthenticated MongoDB connection also failed.');
+            }
+            throw fallbackError;
+          }
+          return client.db(mongoDbName);
+        }
       }
       throw error;
     }
   }
   return client.db(mongoDbName);
+}
+
+function isAuthenticationError(error) {
+  return error?.code === 18 || error?.codeName === 'AuthenticationFailed';
 }
 
 app.get('/api/health', async (_req, res) => {

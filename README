@@ -19,8 +19,8 @@ This project exposes an Apache ECharts dashboard backed by the LibreChat MongoDB
    npm install
    ```
 
-2. Create a `.env` file based on `.env.example` and update it with your MongoDB credentials.
-   - You can either paste a full `MONGODB_URI` (make sure any special characters in the password are percent encoded) or provide the host/port/username/password values separately—the server will safely encode them for you.
+2. Create a `.env` file based on `.env.example` and update it with your MongoDB connection details.
+   - You can either paste a full `MONGODB_URI`/`MONGO_URI` (make sure any special characters in the password are percent encoded) or provide the host/port/username/password values separately—the server will safely encode them for you.
    - When connecting to the hosted LibreChat deployment, set:
 
      ```env
@@ -30,6 +30,8 @@ This project exposes an Apache ECharts dashboard backed by the LibreChat MongoDB
      MONGODB_PASSWORD=TeagascICT2025@!
      MONGODB_AUTH_SOURCE=admin
      ```
+
+   - If you're running LibreChat locally with the default `docker-compose` configuration (which starts MongoDB with `--noauth`), leave the username and password blank. The dashboard automatically retries without credentials when authentication is disabled.
 
 3. Start the server:
 
@@ -47,6 +49,6 @@ This project exposes an Apache ECharts dashboard backed by the LibreChat MongoDB
 
 ## Notes
 
-- If authentication fails, double-check that the credentials in your `.env` file match the database user and that any special characters are encoded (the split variable approach handles this automatically).
+- If authentication fails, double-check that the credentials in your `.env` file match the database user and that any special characters are encoded (the split variable approach handles this automatically). When the server detects an authentication failure and you have provided credentials, it will retry without them in case the target MongoDB instance is running without auth.
 - The dashboard expects the LibreChat database to expose the collections: `users`, `agents`, `agentcategories`, `messages`.
 - The `usersLoggedPerDay` metric is derived from the `updatedAt` field as a proxy for login activity.
