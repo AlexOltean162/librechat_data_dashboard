@@ -14,20 +14,58 @@ app.use(express.json());
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const mongoUri = process.env.MONGODB_URI;
+const mongoUri = buildMongoUri();
 const mongoDbName = process.env.MONGODB_DB || 'LibreChat';
 
 if (!mongoUri) {
-  console.warn('Warning: MONGODB_URI is not set. The API will fail to fetch data until it is configured.');
+  console.warn('Warning: MongoDB connection details are missing. Configure environment variables before starting the server.');
 }
 
-const client = new MongoClient(mongoUri, {
-  maxPoolSize: 10
-});
+const client = mongoUri
+  ? new MongoClient(mongoUri, {
+      maxPoolSize: 10
+    })
+  : null;
+
+function buildMongoUri() {
+  if (process.env.MONGODB_URI) {
+    return process.env.MONGODB_URI;
+  }
+
+  const host = process.env.MONGODB_HOST;
+  const port = process.env.MONGODB_PORT || '27017';
+  const username = process.env.MONGODB_USERNAME;
+  const password = process.env.MONGODB_PASSWORD;
+  const dbName = process.env.MONGODB_DB || 'LibreChat';
+  const authSource = process.env.MONGODB_AUTH_SOURCE;
+
+  if (!host) {
+    return null;
+  }
+
+  const credentials = username && password
+    ? `${encodeURIComponent(username)}:${encodeURIComponent(password)}@`
+    : '';
+
+  const query = authSource ? `?authSource=${encodeURIComponent(authSource)}` : '';
+
+  return `mongodb://${credentials}${host}:${port}/${dbName}${query}`;
+}
 
 async function getDb() {
+  if (!client) {
+    throw new Error('MongoDB client is not configured. Set MONGODB_URI or individual connection variables.');
+  }
+
   if (!client.topology || !client.topology.isConnected()) {
-    await client.connect();
+    try {
+      await client.connect();
+    } catch (error) {
+      if (error?.code === 18 || error?.codeName === 'AuthenticationFailed') {
+        console.error('MongoDB authentication failed. Verify your username/password and ensure special characters are percent-encoded.');
+      }
+      throw error;
+    }
   }
   return client.db(mongoDbName);
 }

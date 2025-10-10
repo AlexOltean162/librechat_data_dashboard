@@ -19,7 +19,17 @@ This project exposes an Apache ECharts dashboard backed by the LibreChat MongoDB
    npm install
    ```
 
-2. Create a `.env` file based on `.env.example` and update it with your MongoDB credentials if necessary.
+2. Create a `.env` file based on `.env.example` and update it with your MongoDB credentials.
+   - You can either paste a full `MONGODB_URI` (make sure any special characters in the password are percent encoded) or provide the host/port/username/password values separately—the server will safely encode them for you.
+   - When connecting to the hosted LibreChat deployment, set:
+
+     ```env
+     MONGODB_HOST=hcux404.teagasc.net
+     MONGODB_PORT=27018
+     MONGODB_USERNAME=admin
+     MONGODB_PASSWORD=TeagascICT2025@!
+     MONGODB_AUTH_SOURCE=admin
+     ```
 
 3. Start the server:
 
@@ -37,6 +47,6 @@ This project exposes an Apache ECharts dashboard backed by the LibreChat MongoDB
 
 ## Notes
 
-- The MongoDB connection string in `.env.example` includes the provided credentials with special characters URL encoded.
+- If authentication fails, double-check that the credentials in your `.env` file match the database user and that any special characters are encoded (the split variable approach handles this automatically).
 - The dashboard expects the LibreChat database to expose the collections: `users`, `agents`, `agentcategories`, `messages`.
 - The `usersLoggedPerDay` metric is derived from the `updatedAt` field as a proxy for login activity.
