@@ -1,1 +1,52 @@
-// Placeholder
+# LibreChat Data Dashboard
+
+This project exposes an Apache ECharts dashboard backed by the LibreChat MongoDB database. The dashboard surfaces headline metrics, activity breakdowns, and a live feed of recent messages by querying the database through an Express API.
+
+## Features
+
+- Total counts for agents, users, and messages.
+- Agent distribution by category with automatic label resolution.
+- Top message authors (users) sorted by activity.
+- Daily time series for message traffic and user logins (based on `updatedAt`).
+- Paginated-ready table populated with the 50 most recent message documents.
+- Responsive layout with animated cards and charts powered by Apache ECharts.
+
+## Getting started
+
+1. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Create a `.env` file based on `.env.example` and update it with your MongoDB credentials.
+   - You can either paste a full `MONGODB_URI` (make sure any special characters in the password are percent encoded) or provide the host/port/username/password values separately—the server will safely encode them for you.
+   - When connecting to the hosted LibreChat deployment, set:
+
+     ```env
+     MONGODB_HOST=hcux404.teagasc.net
+     MONGODB_PORT=27018
+     MONGODB_USERNAME=admin
+     MONGODB_PASSWORD=TeagascICT2025@!
+     MONGODB_AUTH_SOURCE=admin
+     ```
+
+3. Start the server:
+
+   ```bash
+   npm start
+   ```
+
+4. Visit [http://localhost:3000](http://localhost:3000) to view the dashboard.
+
+## Development
+
+- `npm run dev` launches the Express server with hot reload via `nodemon`.
+- The public folder hosts the static dashboard assets (`index.html`, `app.js`, and `styles.css`).
+- API responses are served from `/api/dashboard` and `/api/health`.
+
+## Notes
+
+- If authentication fails, double-check that the credentials in your `.env` file match the database user and that any special characters are encoded (the split variable approach handles this automatically).
+- The dashboard expects the LibreChat database to expose the collections: `users`, `agents`, `agentcategories`, `messages`.
+- The `usersLoggedPerDay` metric is derived from the `updatedAt` field as a proxy for login activity.
