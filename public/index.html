@@ -6,6 +6,7 @@
     <title>LibreChat Data Dashboard</title>
     <link rel="stylesheet" href="./styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
     <script src="./app.js" defer></script>
   </head>
   <body>
@@ -30,20 +31,36 @@
         </article>
       </section>
 
+      <section class="filters" aria-label="Date range filters">
+        <div class="filter-group">
+          <label for="start-date">Start date</label>
+          <input type="date" id="start-date" name="start-date" />
+        </div>
+        <div class="filter-group">
+          <label for="end-date">End date</label>
+          <input type="date" id="end-date" name="end-date" />
+        </div>
+        <div class="filter-actions">
+          <button id="apply-filters" class="btn btn-primary" type="button">Apply</button>
+          <button id="clear-filters" class="btn btn-ghost" type="button">Clear</button>
+          <button id="export-excel" class="btn btn-accent" type="button">Export to Excel</button>
+        </div>
+      </section>
+
       <section class="chart-grid">
-        <div class="chart-card">
+        <div class="chart-card large">
           <h2>Agents per Category</h2>
           <div id="agents-category-chart" class="chart"></div>
         </div>
-        <div class="chart-card">
+        <div class="chart-card large">
           <h2>Messages per User</h2>
           <div id="messages-user-chart" class="chart"></div>
         </div>
-        <div class="chart-card">
+        <div class="chart-card large">
           <h2>Messages per Day</h2>
           <div id="messages-day-chart" class="chart"></div>
         </div>
-        <div class="chart-card">
+        <div class="chart-card large">
           <h2>Users Logged In per Day</h2>
           <div id="users-day-chart" class="chart"></div>
         </div>
@@ -72,6 +89,13 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div class="table-footer">
+            <div class="pagination-controls">
+              <button id="prev-page" class="btn btn-ghost" type="button">Previous</button>
+              <span id="page-indicator">Page 1 of 1</span>
+              <button id="next-page" class="btn btn-ghost" type="button">Next</button>
+            </div>
           </div>
         </div>
       </section>
