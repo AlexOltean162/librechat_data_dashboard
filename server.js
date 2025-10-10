@@ -464,25 +464,6 @@ app.get('/api/dashboard', async (req, res) => {
       ])
       .toArray();
 
-    const usersLoggedPerDayPromise = usersCollection
-      .aggregate([
-        createDateMatchStage('updatedAt', startDate, endDate),
-        {
-          $group: {
-            _id: {
-              $dateToString: {
-                format: '%Y-%m-%d',
-                date: '$updatedAt'
-              }
-            },
-            count: { $sum: 1 }
-          }
-        },
-        { $project: { _id: 0, date: '$_id', count: 1 } },
-        { $sort: { date: 1 } }
-      ])
-      .toArray();
-
     const conversationsPerAgentPromise = (async () => {
       const grouped = await conversationsCollection
         .aggregate([
@@ -640,7 +621,6 @@ app.get('/api/dashboard', async (req, res) => {
       agentsPerCategory,
       messagesPerUser,
       messagesPerDay,
-      usersLoggedPerDay,
       conversationsPerAgent,
       messagesPerAgent,
       messagesByEndpoint,
@@ -650,7 +630,6 @@ app.get('/api/dashboard', async (req, res) => {
       agentsPerCategoryPromise,
       messagesPerUserPromise,
       messagesPerDayPromise,
-      usersLoggedPerDayPromise,
       conversationsPerAgentPromise,
       messagesPerAgentPromise,
       messagesByEndpointPromise,
@@ -671,7 +650,6 @@ app.get('/api/dashboard', async (req, res) => {
       agentsPerCategory,
       messagesPerUser,
       messagesPerDay,
-      usersLoggedPerDay,
       conversationsPerAgent,
       messagesPerAgent,
       messagesByEndpoint,

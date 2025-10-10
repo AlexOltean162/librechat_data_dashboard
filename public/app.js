@@ -289,7 +289,16 @@ function renderMessagesByEndpoint(data = []) {
           borderWidth: 2
         },
         label: {
-          formatter: '{b}: {d}%'
+          formatter: '{b}: {d}%',
+          color: '#ffffff',
+          backgroundColor: 'transparent',
+          borderWidth: 0,
+          borderColor: 'transparent'
+        },
+        labelLine: {
+          lineStyle: {
+            color: '#cbd5f5'
+          }
         },
         data: seriesData
       }
@@ -351,11 +360,6 @@ async function loadDashboard() {
     renderAgentsPerCategory(data.agentsPerCategory);
     renderMessagesPerUser(data.messagesPerUser);
     renderTimeSeriesChart('messages-day-chart', 'Messages', data.messagesPerDay);
-    renderTimeSeriesChart('users-day-chart', 'Users Logged', data.usersLoggedPerDay, {
-      line: '#22c55e',
-      areaStart: 'rgba(34, 197, 94, 0.45)',
-      areaEnd: 'rgba(34, 197, 94, 0.08)'
-    });
     renderMessagesPerAgent(data.messagesPerAgent);
     renderConversationsPerAgent(data.conversationsPerAgent);
     renderTimeSeriesChart('active-users-day-chart', 'Active Users', data.activeUsersPerDay, {
@@ -427,9 +431,6 @@ function exportDashboardToExcel() {
 
   const messagesPerDaySheet = XLSX.utils.json_to_sheet(dashboardState.raw.messagesPerDay ?? []);
   XLSX.utils.book_append_sheet(workbook, messagesPerDaySheet, 'Messages per Day');
-
-  const usersPerDaySheet = XLSX.utils.json_to_sheet(dashboardState.raw.usersLoggedPerDay ?? []);
-  XLSX.utils.book_append_sheet(workbook, usersPerDaySheet, 'Users Logged per Day');
 
   const conversationsPerAgentSheet = XLSX.utils.json_to_sheet(
     (dashboardState.raw.conversationsPerAgent ?? []).map((item) => ({

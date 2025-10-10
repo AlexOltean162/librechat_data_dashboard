@@ -40,7 +40,7 @@ main {
   padding: 2rem clamp(1rem, 5vw, 4rem);
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 2.5rem;
 }
 
 .cards {
@@ -175,6 +175,31 @@ main {
   margin-top: 0.75rem;
 }
 
+
+.chart-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 1.65rem;
+  color: #f8fafc;
+}
+
+.section-header p {
+  margin: 0;
+  color: #94a3b8;
+  max-width: 720px;
+}
+
 .chart-grid {
   display: flex;
   flex-direction: column;
@@ -219,9 +244,9 @@ main {
   padding: 2rem;
 }
 
-.chart-card h2 {
+.chart-card h3 {
   margin: 0 0 1rem;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   color: #e0f2fe;
 }
 

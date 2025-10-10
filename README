@@ -7,8 +7,9 @@ This project exposes an Apache ECharts dashboard backed by the LibreChat MongoDB
 - Total counts for agents, users, and messages.
 - Agent distribution by category with automatic label resolution.
 - Top message authors rendered with the users' first and last names instead of raw identifiers.
-- Daily time series for message traffic, active users, new users, and login activity (based on `updatedAt`).
+- Daily time series for message traffic, active users, and new users.
 - Operational views for messages per agent, conversations per agent, and message distribution by endpoint to highlight adoption patterns.
+- Dedicated sections for user engagement, agent performance, and channel distribution to keep related insights together.
 - Interactive date slicer (single day or range) that refines every chart on demand and reports filter status inline.
 - One-click Excel export covering the headline metrics and all chart datasets for offline analysis.
 - Responsive layout with animated cards and enlarged chart canvases powered by Apache ECharts.
@@ -53,6 +54,5 @@ This project exposes an Apache ECharts dashboard backed by the LibreChat MongoDB
 
 - If authentication fails, double-check that the credentials in your `.env` file match the database user and that any special characters are encoded (the split variable approach handles this automatically). When the server detects an authentication failure and you have provided credentials, it will retry without them in case the target MongoDB instance is running without auth.
 - The dashboard expects the LibreChat database to expose the collections: `users`, `agents`, `agentcategories`, `messages`.
-- The `usersLoggedPerDay` metric is derived from the `updatedAt` field as a proxy for login activity.
 - Date filters operate on the `createdAt` field for message-derived analytics and the `updatedAt` field for user activity; clearing the filters restores the full-range view.
 - Excel exports include the currently filtered datasets. Apply the desired date range before exporting to capture that slice of activity.

@@ -49,51 +49,73 @@
 
       <section id="status-banner" class="status-banner hidden" role="status" aria-live="polite"></section>
 
-      <section class="chart-grid">
-        <div class="chart-row">
-          <div class="chart-card large">
-            <h2>Agents per Category</h2>
-            <div id="agents-category-chart" class="chart"></div>
+      <section class="chart-section">
+        <div class="section-header">
+          <h2>User Engagement</h2>
+          <p>Understand how people across the organisation are interacting with LibreChat each day.</p>
+        </div>
+        <div class="chart-grid">
+          <div class="chart-row">
+            <div class="chart-card large">
+              <h3>Messages per Day</h3>
+              <div id="messages-day-chart" class="chart"></div>
+            </div>
+            <div class="chart-card large">
+              <h3>Active Users per Day</h3>
+              <div id="active-users-day-chart" class="chart"></div>
+            </div>
           </div>
-          <div class="chart-card large">
-            <h2>Messages per User</h2>
-            <div id="messages-user-chart" class="chart"></div>
+          <div class="chart-row single">
+            <div class="chart-card full">
+              <h3>New Users per Day</h3>
+              <div id="new-users-day-chart" class="chart"></div>
+            </div>
+          </div>
+          <div class="chart-row single">
+            <div class="chart-card full">
+              <h3>Messages per User</h3>
+              <div id="messages-user-chart" class="chart"></div>
+            </div>
           </div>
         </div>
-        <div class="chart-row">
-          <div class="chart-card large">
-            <h2>Messages per Day</h2>
-            <div id="messages-day-chart" class="chart"></div>
+      </section>
+
+      <section class="chart-section">
+        <div class="section-header">
+          <h2>Agent Performance</h2>
+          <p>Review how virtual agents are categorised and the activity each one is supporting.</p>
+        </div>
+        <div class="chart-grid">
+          <div class="chart-row">
+            <div class="chart-card large">
+              <h3>Agents per Category</h3>
+              <div id="agents-category-chart" class="chart"></div>
+            </div>
+            <div class="chart-card large">
+              <h3>Messages per Agent</h3>
+              <div id="messages-agent-chart" class="chart"></div>
+            </div>
           </div>
-          <div class="chart-card large">
-            <h2>Users Logged In per Day</h2>
-            <div id="users-day-chart" class="chart"></div>
+          <div class="chart-row single">
+            <div class="chart-card full">
+              <h3>Conversations per Agent</h3>
+              <div id="conversations-agent-chart" class="chart"></div>
+            </div>
           </div>
         </div>
-        <div class="chart-row">
-          <div class="chart-card large">
-            <h2>Messages per Agent</h2>
-            <div id="messages-agent-chart" class="chart"></div>
-          </div>
-          <div class="chart-card large">
-            <h2>Conversations per Agent</h2>
-            <div id="conversations-agent-chart" class="chart"></div>
-          </div>
+      </section>
+
+      <section class="chart-section">
+        <div class="section-header">
+          <h2>Channel Distribution</h2>
+          <p>Compare which integration endpoints are producing the largest share of conversations.</p>
         </div>
-        <div class="chart-row">
-          <div class="chart-card large">
-            <h2>Active Users per Day</h2>
-            <div id="active-users-day-chart" class="chart"></div>
-          </div>
-          <div class="chart-card large">
-            <h2>New Users per Day</h2>
-            <div id="new-users-day-chart" class="chart"></div>
-          </div>
-        </div>
-        <div class="chart-row single">
-          <div class="chart-card full">
-            <h2>Messages by Endpoint</h2>
-            <div id="messages-endpoint-chart" class="chart"></div>
+        <div class="chart-grid">
+          <div class="chart-row single">
+            <div class="chart-card full">
+              <h3>Messages by Endpoint</h3>
+              <div id="messages-endpoint-chart" class="chart"></div>
+            </div>
           </div>
         </div>
       </section>
