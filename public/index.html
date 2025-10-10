@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LibreChat Data Dashboard</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <h1>LibreChat Analytics Dashboard</h1>
+      <p>Real-time insights sourced directly from the LibreChat MongoDB database.</p>
+    </header>
+
+    <main>
+      <section class="cards" id="summary-cards">
+        <article class="card">
+          <h2>Total Agents</h2>
+          <p id="total-agents" class="metric">-</p>
+        </article>
+        <article class="card">
+          <h2>Total Users</h2>
+          <p id="total-users" class="metric">-</p>
+        </article>
+        <article class="card">
+          <h2>Total Messages</h2>
+          <p id="total-messages" class="metric">-</p>
+        </article>
+      </section>
+
+      <section class="filters" aria-label="Date range filters">
+        <div class="filter-group">
+          <label for="start-date">Start date</label>
+          <input type="date" id="start-date" name="start-date" />
+        </div>
+        <div class="filter-group">
+          <label for="end-date">End date</label>
+          <input type="date" id="end-date" name="end-date" />
+        </div>
+        <div class="filter-actions">
+          <button id="apply-filters" class="btn btn-primary" type="button">Apply</button>
+          <button id="clear-filters" class="btn btn-ghost" type="button">Clear</button>
+          <button id="export-excel" class="btn btn-accent" type="button">Export to Excel</button>
+        </div>
+      </section>
+
+      <section id="status-banner" class="status-banner hidden" role="status" aria-live="polite"></section>
+
+      <section class="chart-grid">
+        <div class="chart-row">
+          <div class="chart-card large">
+            <h2>Agents per Category</h2>
+            <div id="agents-category-chart" class="chart"></div>
+          </div>
+          <div class="chart-card large">
+            <h2>Messages per User</h2>
+            <div id="messages-user-chart" class="chart"></div>
+          </div>
+        </div>
+        <div class="chart-row">
+          <div class="chart-card large">
+            <h2>Messages per Day</h2>
+            <div id="messages-day-chart" class="chart"></div>
+          </div>
+          <div class="chart-card large">
+            <h2>Users Logged In per Day</h2>
+            <div id="users-day-chart" class="chart"></div>
+          </div>
+        </div>
+        <div class="chart-row">
+          <div class="chart-card large">
+            <h2>Messages per Agent</h2>
+            <div id="messages-agent-chart" class="chart"></div>
+          </div>
+          <div class="chart-card large">
+            <h2>Conversations per Agent</h2>
+            <div id="conversations-agent-chart" class="chart"></div>
+          </div>
+        </div>
+        <div class="chart-row">
+          <div class="chart-card large">
+            <h2>Active Users per Day</h2>
+            <div id="active-users-day-chart" class="chart"></div>
+          </div>
+          <div class="chart-card large">
+            <h2>New Users per Day</h2>
+            <div id="new-users-day-chart" class="chart"></div>
+          </div>
+        </div>
+        <div class="chart-row single">
+          <div class="chart-card full">
+            <h2>Messages by Endpoint</h2>
+            <div id="messages-endpoint-chart" class="chart"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>LibreChat data dashboard • Powered by Apache ECharts</p>
+    </footer>
+  </body>
+</html>
